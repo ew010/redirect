@@ -1,10 +1,10 @@
-import 'package:device_apps/device_apps.dart';
+import 'package:installed_apps/app_info.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../services/root_service.dart';
 
 class AppDetailsScreen extends StatefulWidget {
-  final Application app;
+  final AppInfo app;
 
   const AppDetailsScreen({super.key, required this.app});
 
@@ -28,12 +28,21 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
   }
 
   Future<void> _checkStatus() async {
+    final pkg = widget.app.packageName;
+    if (pkg == null) {
+      setState(() {
+         _error = "Package name is null";
+         _isLoading = false;
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      final isRedirected = await _rootService.isRedirected(widget.app.packageName);
+      final isRedirected = await _rootService.isRedirected(pkg);
       String? target;
       if (isRedirected) {
-        target = await _rootService.getRedirectTarget(widget.app.packageName);
+        target = await _rootService.getRedirectTarget(pkg);
       }
       
       if (mounted) {
@@ -66,6 +75,9 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
   }
 
   Future<void> _redirect() async {
+    final pkg = widget.app.packageName;
+    if (pkg == null) return;
+
     final targetPath = _pathController.text.trim();
     if (targetPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,8 +93,8 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
         title: const Text('Confirm Redirection'),
         content: Text(
           'WARNING: This operation requires root access and modifies system files.\n\n'
-          'We will move data from:\n/data/data/${widget.app.packageName}\n\n'
-          'To:\n$targetPath/${widget.app.packageName}\n\n'
+          'We will move data from:\n/data/data/$pkg\n\n'
+          'To:\n$targetPath/$pkg\n\n'
           'Ensure the target location supports Linux permissions (ext4/f2fs). '
           'Redirecting to FAT32/exFAT (standard SD cards) WILL likely break the app due to permission loss.',
         ),
@@ -108,7 +120,7 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
     });
 
     try {
-      await _rootService.redirectAppData(widget.app.packageName, targetPath);
+      await _rootService.redirectAppData(pkg, targetPath);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Redirection successful!')),
@@ -126,13 +138,16 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
   }
 
   Future<void> _restore() async {
+    final pkg = widget.app.packageName;
+    if (pkg == null) return;
+
      // Confirm dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirm Restore'),
         content: Text(
-          'This will move data back to original location:\n/data/data/${widget.app.packageName}\n\n'
+          'This will move data back to original location:\n/data/data/$pkg\n\n'
           'And remove the data from the custom location.',
         ),
         actions: [
@@ -156,7 +171,7 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
     });
 
     try {
-      await _rootService.restoreAppData(widget.app.packageName);
+      await _rootService.restoreAppData(pkg);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Restored successfully!')),
@@ -177,7 +192,7 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.app.appName),
+        title: Text(widget.app.name ?? "Unknown"),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -185,12 +200,12 @@ class _AppDetailsScreenState extends State<AppDetailsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: widget.app is ApplicationWithIcon
-                  ? Image.memory((widget.app as ApplicationWithIcon).icon, width: 80)
+              child: widget.app.icon != null
+                  ? Image.memory(widget.app.icon!, width: 80)
                   : const Icon(Icons.android, size: 80),
             ),
             const SizedBox(height: 16),
-            Center(child: Text(widget.app.packageName, style: Theme.of(context).textTheme.bodySmall)),
+            Center(child: Text(widget.app.packageName ?? "Unknown Package", style: Theme.of(context).textTheme.bodySmall)),
             const SizedBox(height: 24),
             
             if (_isLoading)

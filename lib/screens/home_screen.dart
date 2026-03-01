@@ -1,4 +1,5 @@
-import 'package:device_apps/device_apps.dart';
+import 'package:installed_apps/app_info.dart';
+import 'package:installed_apps/installed_apps.dart';
 import 'package:flutter/material.dart';
 import '../services/root_service.dart';
 import 'app_details_screen.dart';
@@ -13,7 +14,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final RootService _rootService = RootService();
   bool _hasRoot = false;
-  List<Application> _apps = [];
+  List<AppInfo> _apps = [];
   bool _isLoading = true;
 
   @override
@@ -46,14 +47,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoading = true;
     });
     // Getting all apps can be slow, maybe filter system apps out initially or allow toggle
-    final apps = await DeviceApps.getInstalledApplications(
-      includeAppIcons: true,
-      includeSystemApps: false, // User apps are safer to mess with
-      onlyAppsWithLaunchIntent: true,
+    final apps = await InstalledApps.getInstalledApps(
+      true, // excludeSystemApps
+      true, // withIcon
     );
     
     // Sort by name
-    apps.sort((a, b) => a.appName.toLowerCase().compareTo(b.appName.toLowerCase()));
+    apps.sort((a, b) => (a.name ?? "").toLowerCase().compareTo((b.name ?? "").toLowerCase()));
 
     if (mounted) {
       setState(() {
@@ -108,12 +108,13 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (context, index) {
                 final app = _apps[index];
                 return ListTile(
-                  leading: app is ApplicationWithIcon
-                      ? Image.memory(app.icon, width: 40)
+                  leading: app.icon != null
+                      ? Image.memory(app.icon!, width: 40)
                       : const Icon(Icons.android),
-                  title: Text(app.appName),
-                  subtitle: Text(app.packageName),
+                  title: Text(app.name ?? app.packageName ?? "Unknown"),
+                  subtitle: Text(app.packageName ?? ""),
                   onTap: () {
+                    if (app.packageName == null) return;
                     Navigator.push(
                       context,
                       MaterialPageRoute(
